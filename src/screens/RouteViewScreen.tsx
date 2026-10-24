@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { MapType, Marker, Polyline } from 'react-native-maps';
+import OSMRouteMap from '../components/OSMRouteMap';
 import * as Location from 'expo-location';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
@@ -19,7 +19,6 @@ const MODES: Mode[] = ['Drive', 'Ride', 'Walk'];
 export default function RouteViewScreen({ navigation }: Props) {
   const { pickup, dropoff } = useTrip();
   const insets = useSafeAreaInsets();
-  const mapRef = useRef<MapView>(null);
   const [mode, setMode] = useState<Mode>('Drive');
   const [satellite, setSatellite] = useState(false);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -35,14 +34,6 @@ export default function RouteViewScreen({ navigation }: Props) {
         if (!isMounted) return;
         setTripData(data);
         setLoadingRoute(false);
-        if (data.coordinates.length > 0) {
-          setTimeout(() => {
-            mapRef.current?.fitToCoordinates(data.coordinates, {
-              edgePadding: { top: 90, right: 50, bottom: 440, left: 50 },
-              animated: true,
-            });
-          }, 350);
-        }
       });
     }
     return () => {
@@ -52,7 +43,6 @@ export default function RouteViewScreen({ navigation }: Props) {
 
   if (!pickup || !dropoff) return null;
 
-  const mapType: MapType = satellite ? 'hybrid' : 'standard';
   const coords = tripData?.coordinates ?? [];
   const steps = tripData?.steps ?? [];
 
@@ -85,23 +75,9 @@ export default function RouteViewScreen({ navigation }: Props) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        const cur = await Location.getCurrentPositionAsync({});
-        mapRef.current?.animateCamera({
-          center: { latitude: cur.coords.latitude, longitude: cur.coords.longitude },
-          pitch: 50,
-          heading: cur.coords.heading || 0,
-          zoom: 17,
-        });
-
         locationSub.current = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 5 },
-          (loc) => {
-            mapRef.current?.animateCamera({
-              center: { latitude: loc.coords.latitude, longitude: loc.coords.longitude },
-              pitch: 50,
-              heading: loc.coords.heading || 0,
-            });
-          }
+          () => {}
         );
       }
     } catch {}
@@ -114,12 +90,6 @@ export default function RouteViewScreen({ navigation }: Props) {
     }
     setIsNavigating(false);
     showToast('Navigation ended');
-    if (tripData?.coordinates.length) {
-      mapRef.current?.fitToCoordinates(tripData.coordinates, {
-        edgePadding: { top: 90, right: 50, bottom: 440, left: 50 },
-        animated: true,
-      });
-    }
   };
 
   useEffect(() => {
@@ -132,21 +102,12 @@ export default function RouteViewScreen({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFill}
-        mapType={mapType}
-        showsUserLocation={true}
-        showsMyLocationButton={false}
-        initialRegion={{ latitude: pickup.lat, longitude: pickup.lng, latitudeDelta: 0.12, longitudeDelta: 0.12 }}
-        toolbarEnabled={false}
-      >
-        {coords.length > 0 && (
-          <Polyline coordinates={coords} strokeColor={colors.primary} strokeWidth={6} />
-        )}
-        <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }} title={pickup.title} pinColor={colors.primary} />
-        <Marker coordinate={{ latitude: dropoff.lat, longitude: dropoff.lng }} title={dropoff.title} />
-      </MapView>
+      <OSMRouteMap
+        pickup={pickup}
+        dropoff={dropoff}
+        routeCoords={coords}
+        satellite={satellite}
+      />
 
       {/* Top Bar or Navigation HUD */}
       {!isNavigating ? (

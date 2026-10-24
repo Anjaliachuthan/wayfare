@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Region } from 'react-native-maps';
+import OSMPickerMap from '../components/OSMPickerMap';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../components/Button';
 import { useTrip } from '../context/TripContext';
@@ -24,7 +24,7 @@ export default function MapPickerScreen({ navigation, route }: Props) {
       lng: 76.185,
     };
 
-  const [region, setRegion] = useState<Region>({
+  const [region, setRegion] = useState({
     latitude: initialCoord.lat,
     longitude: initialCoord.lng,
     latitudeDelta: 0.03,
@@ -35,14 +35,7 @@ export default function MapPickerScreen({ navigation, route }: Props) {
   const [subAddress, setSubAddress] = useState<string>('');
   const [loadingAddress, setLoadingAddress] = useState(false);
 
-  const onRegionChangeComplete = async (newRegion: Region) => {
-    setRegion(newRegion);
-    setLoadingAddress(true);
-    const resolved = await reverseGeocodeOSM(newRegion.latitude, newRegion.longitude);
-    setAddress(resolved.title);
-    setSubAddress(resolved.subtitle);
-    setLoadingAddress(false);
-  };
+
 
   const onConfirm = () => {
     const selectedPlace = {
@@ -64,10 +57,17 @@ export default function MapPickerScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={StyleSheet.absoluteFill}
-        initialRegion={region}
-        onRegionChangeComplete={onRegionChangeComplete}
+      <OSMPickerMap
+        initialLat={initialCoord.lat}
+        initialLng={initialCoord.lng}
+        onCenterChange={async (lat, lng) => {
+          setRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.03, longitudeDelta: 0.03 });
+          setLoadingAddress(true);
+          const resolved = await reverseGeocodeOSM(lat, lng);
+          setAddress(resolved.title);
+          setSubAddress(resolved.subtitle);
+          setLoadingAddress(false);
+        }}
       />
 
       {/* Center Pin Overlay */}
